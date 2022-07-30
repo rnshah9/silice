@@ -3,3 +3,4 @@ target: stl2raw
 
 cmds:
   - cmd: /stl2raw @@
+    filepath: /test.stl
