@@ -10,11 +10,5 @@ RUN ./compile_silice_linux.sh
 WORKDIR /repo/tools/stl2raw/build
 RUN cmake ..
 RUN make -j8
-RUN mkdir -p /deps
-RUN ldd /repo/tools/stl2raw/build/stl2raw | tr -s '[:blank:]' '\n' | grep '^/' | xargs -I % sh -c 'cp % /deps;'
-
 FROM ubuntu:22.04 as package
-
-COPY --from=builder /deps /deps
-COPY --from=builder /repo/tools/stl2raw/build/stl2raw /repo/tools/stl2raw/build/stl2raw
-ENV LD_LIBRARY_PATH=/deps
+COPY --from=builder /repo/tools/stl2raw/build/stl2raw /

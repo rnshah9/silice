@@ -2,5 +2,4 @@ project: silice
 target: stl2raw
 
 cmds:
-  - cmd: /repo/tools/stl2raw/build/stl2raw /test.stl
-    filepath: /test.stl
+  - cmd: /stl2raw @@
