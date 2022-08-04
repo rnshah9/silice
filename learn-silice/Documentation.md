@@ -20,16 +20,16 @@ When designing with Silice your code describes circuits. If not done already, it
         -   [Arithmetic, comparison, bit-wise, reduction,
             shift](#arithmetic-comparison-bit-wise-reduction-shift)
         -   [Concatenation](#concatenation)
-        -   [Bindings](#sec:bindings)
-        -   [Always assign](#sec:contassign)
-        -   [Bound expressions](#sec:exprtrack)
-    -   [Groups](#sec:groups)
-    -   [Interfaces](#sec:interfaces)
-    -   [Bitfields](#sec:bitfields)
+        -   [Bindings](#bindings)
+        -   [Always assign](#contassign)
+        -   [Bound expressions](#exprtrack)
+    -   [Groups](#groups)
+    -   [Interfaces](#interfaces)
+    -   [Bitfields](#bitfields)
     -   [Intrinsics](#intrinsics)
 -   [Algorithms](#algorithms)
     -   [Declaration](#declaration)
-    -   [Instantiation](#sec:instantiation)
+    -   [Instantiation](#instantiation)
     -   [Call](#call)
     -   [Subroutines](#subroutines)
     -   [Circuitry](#circuitry)
@@ -38,8 +38,8 @@ When designing with Silice your code describes circuits. If not done already, it
     -   [Always blocks](#always-blocks)
     -   [Clock and reset](#clock-and-reset)
     -   [Modifiers](#modifiers)
--   [Execution flow and cycle utilization rules](#sec:execflow)
-    -   [The step operator](#sec:step)
+-   [Execution flow and cycle utilization rules](#execution-flow-and-cycle-utilization-rules)
+    -   [The step operator](#the-step-operator)
     -   [Control flow](#control-flow)
     -   [Cycle costs of calls to algorithms and
         subroutines](#cycle-costs-of-calls-to-algorithms-and-subroutines)
@@ -54,7 +54,7 @@ When designing with Silice your code describes circuits. If not done already, it
     -   [Append](#append)
     -   [Import](#import)
     -   [Wrapping](#wrapping)
--   [Host hardware frameworks](#sec:host)
+-   [Host hardware frameworks](#host-hardware-frameworks)
     -   [VGA emulation](#vga-emulation)
 
 GitHub repository: <https://github.com/sylefeb/Silice/>
@@ -214,11 +214,11 @@ It is recommended to always specify the size of your constants, as this helps ha
 
 Variables are declared with the following pattern:
 
--   `TYPE ID = VALUE;` initializes the variable with VALUE on unit
-    start / reset.
+-   `TYPE ID = VALUE;` initializes the variable with VALUE when the unit
+    algorithm starts, or the unit comes out of reset if no algorithm is present.
 
--   `TYPE ID(VALUE);` initializes the variable with VALUE on *power-up*
-    (when the FPGA is turned on or configured).
+-   `TYPE ID(VALUE);` initializes the variable with VALUE on configuration
+    (every time the FPGA is configured, including power-up).
 
 Above, `TYPE` is a type definition
 (Section <a href="#types" data-reference-type="ref" data-reference="types">Types</a>),
@@ -281,7 +281,7 @@ Block RAMs are declared in a way similar to tables. Block RAMs map to
 special FPGA blocks and avoid using FPGA LUTs to store data. However,
 accessing a block RAM typically requires a one-cycle latency.
 
-> **Important:** Block RAMs are only initialized at *power-up* (when the FPGA is configured).
+> **Important:** Block RAMs are only initialized when the FPGA is configured.
 
 A block RAM variable has four members accessible with the ’dot’ syntax:
 - `addr` the address being accessed,
@@ -395,9 +395,9 @@ The bidirectional binding is reserved for two use cases:
 
 -  binding `inout` variables,
 -  binding groups (see
-    Section <a href="#sec:groups" data-reference-type="ref" data-reference="sec:groups">3.7</a>)
+    Section <a href="#groups">groups</a>)
     and interfaces (see
-    Section <a href="#sec:interfaces" data-reference-type="ref" data-reference="sec:interfaces">3.8</a>).
+    Section <a href="#interfaces">interfaces</a>).
 
 There are two other versions of the binding operators:
 
@@ -507,7 +507,7 @@ algorithm foo( ... )
 ### main (design 'entry point').
 
 The top level unit is called *main*, and has to be defined in a standalone design. It is automatically instantiated by the *host hardware framework*, see
-Section <a href="#sec:host" data-reference-type="ref" data-reference="sec:host">8</a>.
+Section <a href="#host-hardware-frameworks">host hardware frameworks</a>.
 
 ## Unit declaration
 
@@ -908,7 +908,7 @@ circuitry writeData(inout sd,input addr,input data) {
 ```
 
 Note the use of inout for sd (which is a group, see
-Section <a href="#sec:groups" data-reference-type="ref" data-reference="sec:groups">3.7</a>).
+Section <a href="#groups">groups</a>).
 A circuitry is not called, it is instantiated. This means that every
 instantiation is indeed a duplication of the circuitry.
 
@@ -1078,8 +1078,8 @@ is functionally the same as
 a := 0;
 ```
 
-*Note:* variables changed in `always_after` blocks have to use power-up
-initialization only.
+*Note:* variables changed in `always_after` blocks have to use on configuration-time
+initialization only (e.g. `uint8 v(0)`).
 
 ## Clock and reset
 
@@ -1320,7 +1320,7 @@ group sdram_32b_io
 ```
 
 Note that group declarations are made *outside* of algorithms. Group members
-can also use power-up initializers, e.g. `uint24 addr(0), ...`
+can also use configuration initializers, e.g. `uint24 addr(0), ...`
 
 A group variable can then be declared directly:
 
@@ -1364,7 +1364,9 @@ A group can be passed in a call if the algorithm describes an anonymous interfac
 
 > **Note:** A group cannot contain tables nor other groups.
 
-## Anonymous interfaces
+## Interfaces
+
+### Anonymous interfaces
 
 Interfaces can be declared for a group during algorithm definition.
 
@@ -1398,7 +1400,7 @@ algorithm foo(
 
 Anonymous interfaces allow groups to be given as parameters during calls.
 
-## Named interfaces
+### Named interfaces
 
 Named interfaces are ways to describe what inputs and outputs an algorithm expects, without knowing in advance the exact specification of these fields (e.g. their widths).
 Besides making algorithm IO description more compact, this provides genericity.
@@ -1677,10 +1679,8 @@ Import is the most interesting way to inter-operate with Verilog. Once
 imported, all Verilog modules from the Verilog source file will be
 available for inclusion in algorithms.
 
-The modules are instantiated in a very similar way as algorithms, with
-bindings to variables. However, modules cannot be called like
-algorithms, and the ’dot’ syntax to read/write outputs and inputs is not
-available for modules.
+The modules are instantiated in a very similar way as units, with
+bindings to variables and dot syntax.
 
 ## Wrapping
 

@@ -68,6 +68,8 @@ TOSIGNED            : '__signed' ;
 
 TOUNSIGNED          : '__unsigned' ;
 
+INLINE_V            : '__verilog' ;
+
 DONE                : 'isdone' ;
 
 ALWAYS              : 'always';
@@ -134,16 +136,20 @@ RDEFINE             : ':>' ;
 BDEFINE             : '<:>';
 LDEFINEDBL          : '<::' ;
 BDEFINEDBL          : '<::>';
-AUTO                : '<:auto:>' ;
+AUTOBIND            : '<:auto:>' ;
+AUTO                : 'auto' ;
 
 ALWSASSIGNDBL       : '::=' ;
 ALWSASSIGN          : ':=' ;
 
-OUTASSIGN           : '^=' ;
+OUTASSIGN_BEFORE    : '^=' ;
+OUTASSIGN_AFTER     : 'v=' ;
 
 HASH                : '#';
 
 IDENTIFIER          : LETTER+ (DIGIT|LETTERU)* ;
+
+NONAME              : '_';
 
 CONSTANT            : '-'? DIGIT+ ('b'|'h'|'d') (DIGIT|[a-fA-Fxz])+ ;
 
@@ -161,7 +167,7 @@ NEXT                : '++:' ;
 
 ATTRIBS             : '(*' ~[\r\n]* '*)' ;
 
-STRING              : '"' ~[\r\n"]* '"' ; // '; // antlr-mode is broken and does not handle literal `"` in selectors
+STRING              : '"' (~[\r\n"] | '\\"')* '"' ; // '; // antlr-mode is broken and does not handle literal `"` in selectors
 
 ERROR_CHAR          : . ; // catch-all to move lexer errors to parser
 
@@ -182,8 +188,9 @@ sstacksz            :  'stack:' NUMBER ; // deprecated
 sformdepth          :  '#depth' '=' NUMBER ;
 sformtimeout        :  '#timeout' '=' NUMBER ;
 sformmode           :  '#mode' '=' IDENTIFIER ('&' IDENTIFIER)* ;
+sspecialize         :  IDENTIFIER ':' TYPE ;
 
-bpModifier          : sclock | sreset | sautorun | sonehot | sstacksz | sformdepth | sformtimeout | sformmode | sreginput ;
+bpModifier          : sclock | sreset | sautorun | sonehot | sstacksz | sformdepth | sformtimeout | sformmode | sreginput | sspecialize;
 bpModifiers         : '<' bpModifier (',' bpModifier)* '>' ;
 
 pad                 : PAD '(' (value | UNINITIALIZED) ')' ;
@@ -196,22 +203,22 @@ memClocks           : (clk0=sclock ',' clk1=sclock) ;
 memModifier         : memClocks | memNoInputLatch | memDelayed | STRING;
 memModifiers        : '<' memModifier (',' memModifier)* ','? '>' ;
 
-type                   : TYPE | (SAMEAS '(' base=IDENTIFIER ('.' member=IDENTIFIER)? ')') ;
+type                   : TYPE | (SAMEAS '(' base=IDENTIFIER ('.' member=IDENTIFIER)? ')') | AUTO;
 declarationWire        : type alwaysAssigned;
 declarationVarInitSet  : '=' (value | UNINITIALIZED) ;
 declarationVarInitCstr : '(' (value | UNINITIALIZED) ')';
 declarationVar         : type IDENTIFIER ( declarationVarInitSet | declarationVarInitCstr )? ATTRIBS? ;
 declarationTable       : type IDENTIFIER '[' NUMBER? ']' ('=' (initList | STRING | UNINITIALIZED))? ;
 declarationMemory      : (BRAM | BROM | DUALBRAM | SIMPLEDUALBRAM) TYPE name=IDENTIFIER memModifiers? '[' NUMBER? ']' ('=' (initList | STRING | UNINITIALIZED))? ;
-declarationInstance    : blueprint=IDENTIFIER name=IDENTIFIER bpModifiers? ( '(' bpBindingList ')' ) ? ;
+declarationInstance    : blueprint=IDENTIFIER (name=IDENTIFIER | NONAME) bpModifiers? ( '(' bpBindingList ')' ) ? ;
 declaration            : declarationVar | declarationInstance | declarationTable | declarationMemory | declarationWire;
 
-bpBinding              : left=IDENTIFIER (LDEFINE | LDEFINEDBL | RDEFINE | BDEFINE | BDEFINEDBL) right=idOrAccess | AUTO;
+bpBinding              : left=IDENTIFIER (LDEFINE | LDEFINEDBL | RDEFINE | BDEFINE | BDEFINEDBL) right=idOrAccess | AUTOBIND;
 bpBindingList          : bpBinding ',' bpBindingList | bpBinding | ;
 
 /* -- io lists -- */
 
-io                  : ( (is_input='input' nolatch='!'? ) | (is_output='output' combinational='!'?) | is_inout='inout' ) IDENTIFIER declarationVarInitCstr? ;
+io                  : ( (is_input='input' nolatch='!'? ) | (is_output='output' combinational='!'? combinational_nocheck='(!)'?) | is_inout='inout' ) IDENTIFIER declarationVarInitCstr? ;
 
 ioList              : io (',' io)* ','? | ;
 
@@ -230,7 +237,7 @@ intrface            : INTERFACE IDENTIFIER '{' ioList '}' ;
 
 /* -- io definition (from group or interface) -- */
 
-ioDef               : (INPUT | (OUTPUT combinational='!'?))? defid=IDENTIFIER groupname=IDENTIFIER ('{' ioList '}')? ;
+ioDef               : (INPUT | (OUTPUT combinational='!'? combinational_nocheck='(!)'?))? defid=IDENTIFIER groupname=IDENTIFIER ('{' ioList '}')? ;
 
 /* -- bitfields -- */
 
@@ -327,8 +334,8 @@ idOrAccess          : (  access | IDENTIFIER) ;
 
 /* -- Assignments -- */
 
-assignment          : IDENTIFIER  ('=' | OUTASSIGN) expression_0
-                    | access      ('=' | OUTASSIGN) expression_0 ;
+assignment          : IDENTIFIER  ('=' | OUTASSIGN_BEFORE | OUTASSIGN_AFTER) expression_0
+                    | access      ('=' | OUTASSIGN_BEFORE | OUTASSIGN_AFTER) expression_0 ;
 
 alwaysAssigned      : IDENTIFIER   (ALWSASSIGN    | LDEFINE   ) expression_0
                     | access        ALWSASSIGN                  expression_0
@@ -349,7 +356,9 @@ syncExec            : joinExec LARROW '(' callParamList ')' ;
 /* -- Circuitry instantiation -- */
 
 idOrIoAccessList    : idOrIoAccess ',' idOrIoAccessList
+                    | constValue   ',' idOrIoAccessList
                     | idOrIoAccess
+                    | constValue
                     |
                     ;
 
@@ -380,6 +389,8 @@ whileLoop           : 'while' '(' expression_0 ')' while_block=block ;
 
 display             : (DISPLAY | DISPLWRITE) '(' STRING ( ',' callParamList )? ')';
 
+inline_v            : INLINE_V '(' STRING ( ',' callParamList )? ')';
+
 finish              : FINISH '(' ')';
 
 instruction         : assignment
@@ -399,6 +410,7 @@ instruction         : assignment
                     | assumestable
                     | assertstable
                     | cover
+                    | inline_v
                     ;
 
 alwaysBlock         : ALWAYS        block;
@@ -411,12 +423,12 @@ pipeline            : block ('->' block) +;
 
 /* -- Inputs/outputs -- */
 
-inout               : 'inout' TYPE IDENTIFIER
-                    | 'inout' TYPE IDENTIFIER '[' NUMBER ']';
+inout               : 'inout' declarationVar
+                    | 'inout' declarationTable;
 input               : 'input' nolatch='!'? declarationVar
                     | 'input' nolatch='!'? declarationTable;
-output              : 'output' combinational='!'? declarationVar
-                    | 'output' combinational='!'? declarationTable ;
+output              : 'output' combinational='!'? combinational_nocheck='(!)'? declarationVar
+                    | 'output' combinational='!'? combinational_nocheck='(!)'? declarationTable ;
 outputs             : 'input' OUTPUTS '(' alg=IDENTIFIER ')' grp=IDENTIFIER ;
 inOrOut             :  input | output | inout | ioDef | outputs ;
 inOutList           :  inOrOut (',' inOrOut)* ','? | ;
@@ -497,6 +509,14 @@ riscv               : RISCV IDENTIFIER '(' inOutList ')' riscvModifiers? ('=' in
 
 /* -- Overall structure -- */
 
-topList       :  (unit | algorithm |riscv | importv | appendv | subroutine | circuitry | group | bitfield | intrface) topList | ;
+topList             :  (unit | algorithm  | riscv     | importv | appendv
+                             | subroutine | circuitry | group   | bitfield
+                             | intrface
+                       ) topList
+                    | ;
 
 root                : topList EOF ;
+
+rootInOutList       : inOutList EOF ;
+
+rootUnit            : (unit | algorithm) EOF ;

@@ -13,6 +13,7 @@ $$elseif FOMU then
 import('../../common/plls/fomu_20.v')
 $$elseif ICEBREAKER or ICEBITSY then
 import('../../common/plls/icebrkr_25.v')
+$$ICEV_FAST_SHIFT = 1
 $$end
 
 $$config['bram_wmask_byte_wenable_width'] = 'data'
@@ -60,8 +61,9 @@ $$if SPIFLASH then
   output uint1 sf_mosi,
   input  uint1 sf_miso,
 $$end
+)
 $$if not SIMULATION then
-  ) <@cpu_clock> {
+  <@cpu_clock> {
   // clock
   uint1 cpu_clock  = uninitialized;
   pll clk_gen (
@@ -69,7 +71,7 @@ $$if not SIMULATION then
     clock_out :> cpu_clock
   );
 $$else
-) {
+ {
 $$end
 
 $$if OLED or PMOD then
@@ -149,7 +151,7 @@ $$end
     if (/*memio.wenable[0,1] &*/ memio.addr[11,1]) {
       leds      = mem.wdata[0,5] & {5{memio.addr[0,1]}};
 $$if SIMULATION then
-      if (memio.addr[0,1]) { __display("[cycle %d] LEDs: %b",cycle,leds); }
+      if (memio.addr[0,1]) { __display("[cycle %d] LEDs: %b (%d)",cycle,leds,mem.wdata); }
 $$end
 $$if OLED or PMOD then
       // command
@@ -177,12 +179,10 @@ $$end
   }
 
   algorithm {
-$$if SIMULATION and not BARE then
-    cpu <- ();
-	  while (cycle < 2048) { }
+$$if SIMULATION and not BARE and not OLED then
+	  while (cycle < 16384) { }
 $$else
-    // run the CPU
-    () <- cpu <- ();
+		while (1) { }
 $$end
   }
 
