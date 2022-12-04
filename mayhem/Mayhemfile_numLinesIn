@@ -1,0 +1,5 @@
+project: silice
+target: numlinesin
+
+cmds:
+  - cmd: /fuzz_numLinesIn

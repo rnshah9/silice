@@ -59,7 +59,8 @@ jobs:
       fail-fast: false
       matrix:
         mayhemfile:
-          - mayhem/Mayhemfile
+          - mayhem/Mayhemfile_numLinesIn
+          - mayhem/Mayhemfile_stl2raw
 
     steps:
       - uses: actions/checkout@v3
